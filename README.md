@@ -1,2 +1,2 @@
 # Fortune
-TimeSeries Forecasting With Hierarchical Trends MoE
+TimeSeries Forecasting With Mamba

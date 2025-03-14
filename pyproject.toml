@@ -3,14 +3,14 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "temporal_pyramid_moe"
+name = "mamba_forecast"
 version = "0.1.0"
-description = "Temporal Pyramid MoE : Hierarchical pattern decomposition for univariate MoE long-range forecasting"
+description = "Efficient Mamba Models for Timeseries Forecasting"
 authors = [
     {name = "Yvann VINCENT", email = "yvann.vincent@gmail.com"},
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

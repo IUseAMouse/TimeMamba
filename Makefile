@@ -3,7 +3,7 @@
 # Variables
 PYTHON := python3
 UV := uv
-PROJECT := temporal_pyramid_moe
+PROJECT := mamba_forecast
 
 # Default target
 all: setup installdeps format lint test
@@ -29,18 +29,18 @@ installdeps:
 # Format code
 format:
 	@echo "Formatting code..."
-	$(UV) run black models/ lightning_module.py main.py tests/
-	$(UV) run isort models/ lightning_module.py main.py tests/
+	$(UV) run black src/ tests/
+	$(UV) run isort src/ tests/
 
 # Lint code
 lint:
 	@echo "Linting code..."
-	$(UV) run flake8 models/ lightning_module.py main.py tests/
+	$(UV) run flake8 models/ main.py
 
 # Run tests
 test:
 	@echo "Running tests..."
-	$(UV) run pytest tests/
+	$(UV) run pytest tests/test.py
 
 # Clean up generated files
 clean:
@@ -53,16 +53,6 @@ clean:
 	rm -rf dist
 	rm -rf build
 
-# Run the model with dummy data
-run:
-	@echo "Running model with dummy data..."
-	$(UV) run python main.py
-
-# Run with profiling
-profile:
-	@echo "Running with profiling..."
-	$(UV) run python -m cProfile -o profile.out main.py
-	$(UV) run python -c "import pstats; p = pstats.Stats('profile.out'); p.sort_stats('cumtime').print_stats(30)"
 
 # Train the model
 train:
