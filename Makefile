@@ -35,7 +35,7 @@ format:
 # Lint code
 lint:
 	@echo "Linting code..."
-	$(UV) run flake8 models/ main.py
+	$(UV) run flake8 src/ tests/test.py
 
 # Run tests
 test:
