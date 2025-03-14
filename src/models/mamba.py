@@ -11,68 +11,84 @@ from einops import rearrange, repeat
 class ParallelSelectiveSSM(nn.Module):
     def __init__(self, d_model, d_state, dropout=0.0):
         super().__init__()
-
-        # SSM parameters
+        
+        self.d_model = d_model
+        self.d_state = d_state
+        
         self.A = nn.Parameter(torch.randn(d_model, d_state))
         self.B = nn.Parameter(torch.randn(d_model, d_state))
-
-        # Replace parameter with actual projection layer
+        
         self.C_proj = nn.Linear(d_model, d_model)
-
-        # Optional selective projection
         self.D_proj = nn.Linear(d_model, d_model)
-
-        # Time-step parameter
+        
         self.log_delta = nn.Parameter(torch.zeros(d_model))
-
         self.dropout = nn.Dropout(dropout)
-
+    
     def forward(self, x, mask=None):
         batch, seq_len, d_model = x.shape
-        d_state = self.B.shape[1]
-
-        # Get discrete-time parameters
-        delta = F.softplus(self.log_delta)  # (d_model,)
-
-        # Discretize continuous parameters
-        A_diag = torch.exp(-delta)  # (d_model,)
-
-        # Compute input projection
-        x_proj = self.C_proj(x)  # (batch, seq_len, d_model)
-
-        # Apply selective projection
-        x_proj = x_proj * torch.sigmoid(self.D_proj(x))
-
-        # Apply mask to input if provided
+        
+        # Get transition parameters
+        delta = F.softplus(self.log_delta)
+        A_diag = torch.exp(-delta).unsqueeze(-1)  # [d_model, 1]
+        
+        # Compute input projections
+        x_proj = self.C_proj(x) * torch.sigmoid(self.D_proj(x))
+        
+        # Apply mask if provided
         if mask is not None:
-            mask_expanded = mask.unsqueeze(-1)  # [batch, seq_len, 1]
-            x_proj = x_proj * mask_expanded
-
-        # Sequential implementation for debugging
-        h = torch.zeros(batch, d_model, d_state, device=x.device)
-        output = torch.zeros_like(x)
-
-        for t in range(seq_len):
-            # If using a mask, reset the state when masked
-            if mask is not None and t > 0:
-                # Create mask tensor for this timestep
-                mask_t = mask[:, t].unsqueeze(-1).unsqueeze(-1)  # [batch, 1, 1]
-                # Reset state where mask is False
-                h = h * mask_t
-
-            # Update hidden state: h_t = A * h_{t-1} + B * x_t
-            h = h * A_diag.unsqueeze(-1).unsqueeze(0) + x_proj[:, t, :].unsqueeze(
-                -1
-            ) * self.B.unsqueeze(0)
-
-            # Compute output: y_t = C * h_t
-            output[:, t, :] = self.dropout((h * self.A.unsqueeze(0)).sum(dim=-1))
-
-            # Ensure masked positions have exactly zero output
-            if mask is not None and not mask[:, t].all():
-                output[:, t, :] = output[:, t, :] * mask[:, t].unsqueeze(-1)
-
-        return output, h
+            x_proj = x_proj * mask.unsqueeze(-1)
+        
+        # Prepare B * x_t input term
+        u = (x_proj.unsqueeze(-1) * self.B.unsqueeze(0).unsqueeze(0))  # [batch, seq, d_model, d_state]
+        
+        # Compute state using parallel scan (using PyTorch's cumulative sum)
+        # First, prepare the scan elements: (A_diag, B*x)
+        # For each element at position i, we compute A^i * h_0 + sum(A^(i-j) * B * x_j)
+        # This can be done efficiently with a cumulative sum after scaling
+        
+        # Scale each position by the appropriate A_diag^i
+        A_powers = A_diag.unsqueeze(0).expand(seq_len, d_model, 1)
+        A_powers = torch.cumprod(A_powers, dim=0)  # [seq, d_model, 1]
+        
+        # Compute scaled inputs for scan: A^-i * B * x_i
+        # This scales inputs in reverse order of A powers
+        scaled_u = u / A_powers.unsqueeze(0)
+        
+        # Apply parallel scan using cumulative sum
+        # We compute the inclusive scan in reverse, then scale by A again
+        flipped_scaled_u = torch.flip(scaled_u, [1])  # Reverse sequence dimension
+        
+        if mask is not None:
+            # For masked sequences, we need segment-wise cumulative sum
+            # Create a helper tensor to restart scan at masked positions
+            rev_mask = torch.flip(mask, [1]).unsqueeze(-1).unsqueeze(-1)  # [batch, seq, 1, 1]
+            
+            # Initialize scan result
+            scan_output = torch.zeros_like(flipped_scaled_u)
+            scan_output[:, 0] = flipped_scaled_u[:, 0]
+            
+            # Manual scan that respects mask boundaries
+            for t in range(1, seq_len):
+                prev_state = scan_output[:, t-1]
+                curr_input = flipped_scaled_u[:, t]
+                # Reset state if mask is 0
+                scan_output[:, t] = prev_state * rev_mask[:, t] + curr_input
+        else:
+            # If no mask, use standard cumsum
+            scan_output = torch.cumsum(flipped_scaled_u, dim=1)
+        
+        # Flip back to original order and scale by A
+        scan_output = torch.flip(scan_output, [1])  # [batch, seq, d_model, d_state]
+        h = scan_output * A_powers.unsqueeze(0)  # [batch, seq, d_model, d_state]
+        
+        # Compute output
+        output = self.dropout((h * self.A.unsqueeze(0).unsqueeze(0)).sum(dim=-1))
+        
+        # Apply output mask
+        if mask is not None:
+            output = output * mask.unsqueeze(-1)
+        
+        return output, h[:, -1]  # Return output and final state
 
 
 class MambaBlock(nn.Module):
