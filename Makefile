@@ -52,14 +52,3 @@ clean:
 	rm -rf *.egg-info
 	rm -rf dist
 	rm -rf build
-
-
-# Train the model
-train:
-	@echo "Training model..."
-	$(UV) run python train.py
-
-# Generate documentation
-docs:
-	@echo "Generating documentation..."
-	$(UV) run sphinx-build -b html docs/source docs/build
