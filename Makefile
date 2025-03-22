@@ -7,6 +7,7 @@ PROJECT := mamba_forecast
 
 # Default target
 all: setup installdeps format lint test
+build: setup installdeps
 
 # Setup virtual environment
 setup:
@@ -16,15 +17,14 @@ setup:
 # Create a lockfile for dependencies
 lockdeps:
 	@echo "Locking dependencies..."
-	$(UV) pip compile requirements.txt --output-file requirements.lock
-	$(UV) pip compile requirements-dev.txt --output-file requirements-dev.lock
+	$(UV) pip compile pyproject.toml
+	$(UV) lock
 
 # Install dependencies
 installdeps:
 	@echo "Installing dependencies..."
 	$(UV) pip install -e .
-	$(UV) pip install -r requirements.txt
-	$(UV) pip install -r requirements-dev.txt
+	$(UV) pip install -r pyproject.toml
 
 # Format code
 format:
@@ -52,3 +52,8 @@ clean:
 	rm -rf *.egg-info
 	rm -rf dist
 	rm -rf build
+
+# Train the model on the collection of TSF files
+train:
+	@echo "Training ..."
+	uv run python train.py

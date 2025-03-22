@@ -16,13 +16,17 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "flake8",
-    "black",
-    "isort",
+dependencies = [
+    "torch>=2.0.0",
+    "pytorch-lightning>=2.0.0",
+    "numpy>=1.20.0",
+    "matplotlib>=3.5.0",
+    "einops==0.8.1",
+    "pandas==2.2.3",
+    "pytest==8.3.5",
+    "flake8==7.1.2",
+    "black==25.1.0",
+    "isort==6.0.1",
 ]
 
 [tool.black]
