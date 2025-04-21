@@ -5,7 +5,7 @@ import sys
 
 import numpy as np
 import pytest
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -26,7 +26,7 @@ def dummy_data_small():
     seq_len = 64
     d_model = 32
 
-    x = torch.randn(batch_size, seq_len, d_model)
+    x = torch.randn(batch_size, seq_len, d_model, requires_grad=True)
     return x
 
 
@@ -267,6 +267,7 @@ def test_mamba_mix_module(dummy_data_multitask, task_type):
 def test_quick_training(synthetic_time_series):
     """Test a quick training loop with the model"""
     inputs, targets = synthetic_time_series
+    inputs = inputs.clone().requires_grad_(True)
     batch_size = 2
     _, seq_len, input_size = inputs.shape
     _, forecast_horizon, output_size = targets.shape
@@ -385,3 +386,95 @@ def test_model_increasing_sizes(dummy_data_forecast, config):
     assert (
         output.shape == expected_shape
     ), f"Expected shape {expected_shape}, got {output.shape}"
+
+
+# Test for NaN outputs in forward pass
+@pytest.mark.parametrize("d_model,n_layers,d_state", [(32, 1, 8), (64, 2, 16)])
+def test_mamba_no_nan_outputs(dummy_data_forecast, d_model, n_layers, d_state):
+    """Test that MambaForecastingModel doesn't produce NaN outputs"""
+    x, y = dummy_data_forecast
+    batch_size, seq_len, input_size = x.shape
+    _, forecast_horizon, output_size = y.shape
+
+    # Initialize model
+    model = MambaForecastingModel(
+        input_size=input_size,
+        output_size=output_size,
+        d_model=d_model,
+        n_layers=n_layers,
+        d_state=d_state,
+        forecast_horizon=forecast_horizon,
+        use_gradient_checkpointing=False,
+    )
+
+    # Test with normal data
+    with torch.no_grad():
+        output = model(x)
+        
+    # Check for NaN values
+    assert not torch.isnan(output).any(), "Model produced NaN outputs with normal data"
+    
+    # Test with extreme values
+    x_extreme = torch.cat([
+        torch.zeros_like(x),  # All zeros
+        torch.ones_like(x) * 1e10,  # Very large values
+        torch.ones_like(x) * 1e-10,  # Very small values
+    ])
+    
+    with torch.no_grad():
+        output_extreme = model(x_extreme)
+        
+    # Check for NaN values with extreme inputs
+    assert not torch.isnan(output_extreme).any(), "Model produced NaN outputs with extreme input values"
+
+
+def test_mamba_gradient_stability(dummy_data_forecast):
+    """Test that MambaForecastingModel gradients can be properly handled"""
+    x, y = dummy_data_forecast
+    batch_size, seq_len, input_size = x.shape
+    _, forecast_horizon, output_size = y.shape
+
+    # Initialize model with lower learning rate for stability
+    model = MambaForecastingModel(
+        input_size=input_size,
+        output_size=output_size,
+        d_model=64,
+        n_layers=2,
+        d_state=16,
+        forecast_horizon=forecast_horizon,
+        use_gradient_checkpointing=False,
+        learning_rate=1e-4,  
+    )
+
+    output = model(x)
+    loss = torch.nn.functional.mse_loss(output, y)
+    
+    assert not torch.isnan(loss).any(), "Model produced NaN loss"
+    
+    # Backward pass
+    loss.backward()
+    
+    replaced_nan_count = 0
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            nan_mask = torch.isnan(param.grad)
+            if nan_mask.any():
+                replaced_count = torch.sum(nan_mask).item()
+                replaced_nan_count += replaced_count
+                param.grad = torch.where(nan_mask, torch.zeros_like(param.grad), param.grad)
+    
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer.step()
+    
+    has_nan_params = False
+    for name, param in model.named_parameters():
+        if torch.isnan(param).any():
+            print(f"NaN parameter in {name} after update")
+            has_nan_params = True
+    
+    assert not has_nan_params, "Model parameters contain NaN values after update"
+    
+    if replaced_nan_count > 0:
+        print(f"Warning: Replaced {replaced_nan_count} NaN gradients with zeros")

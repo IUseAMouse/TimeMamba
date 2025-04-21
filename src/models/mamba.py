@@ -1,7 +1,17 @@
+"""
+Implementation of all MAMBA core components :
+
+- Selective SMM with Parallel Inference
+- Mamba Block as defined in the original Mamba paper
+- Mamba Model architectured for Timeseries forecasting tasks
+- Versatile Mamba Implementation that handles both forecasting and standard classification tasks
+"""
+
+
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -196,7 +206,7 @@ class MambaBlock(nn.Module):
         Forward pass with optional gradient checkpointing for memory efficiency
         """
         if self.use_gradient_checkpointing and self.training:
-            return torch.utils.checkpoint.checkpoint(self._forward_impl, x, mask)
+            return torch.utils.checkpoint.checkpoint(self._forward_impl, x, mask, use_reentrant=False)
         else:
             return self._forward_impl(x, mask)
 
@@ -417,6 +427,21 @@ class MambaForecastingModel(pl.LightningModule):
         print(f"- Hidden Dimension: {self.hparams.d_model}")
         print(f"- Number of Layers: {self.hparams.n_layers}")
         print(f"- Forecast Horizon: {self.hparams.forecast_horizon}")
+
+    def on_before_optimizer_step(self, optimizer):
+        """Handle NaN gradients before optimizer steps"""
+        nan_encountered = False
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                is_nan = torch.isnan(param.grad)
+                if is_nan.any():
+                    nan_encountered = True
+                    param.grad = torch.where(is_nan, torch.zeros_like(param.grad), param.grad)
+
+        if nan_encountered:
+            self.log("nan_gradients_detected", 1.0)
+        
+        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
 
 
 class MambaMixModule(pl.LightningModule):

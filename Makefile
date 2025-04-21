@@ -24,7 +24,7 @@ lockdeps:
 installdeps:
 	@echo "Installing dependencies..."
 	$(UV) pip install -e .
-	$(UV) pip install -r pyproject.toml
+	$(UV) sync
 
 # Format code
 format:
