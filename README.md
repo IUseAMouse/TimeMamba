@@ -4,16 +4,11 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**TimeMamba** is a PyTorch implementation of the Mamba state space model for time series forecasting. It leverages the powerful Mamba architecture to provide efficient and accurate predictions for time series data with O(n) memory complexity.
+**TimeMamba** is a PyTorch implementation of the Mamba state space model for time series forecasting.
 
-## Features
+The project is currently **frozen**, and simply serves as an example of implementation of Mamba in PyTorch.
 
-I am currently working towards these features :
-
-- 🚀 **Efficient Implementation**: Optimized for both memory usage and speed using selective state space models
-- 📈 **Time Series Forecasting**: Direct multi-step forecasting for various horizons
-- 🔌 **PyTorch Lightning Integration**: Easy training, validation, and testing with built-in best practices
-- 🧩 **Extensible Architecture**: Modular design that can be easily adapted for different time series tasks
+Feel free to clone the repository and to run the tests, all of them are working.
 
 ## Installation
 
