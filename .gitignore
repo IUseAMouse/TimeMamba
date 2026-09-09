@@ -67,3 +67,11 @@ wheels/
 
 # Generated diagrams
 diagram.png
+# Local data and run outputs
+src/dataset/
+lightning_logs/
+mlruns/
+checkpoints/
+logs/
+wandb/
+evaluation/

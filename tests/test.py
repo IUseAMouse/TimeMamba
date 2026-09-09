@@ -5,7 +5,7 @@ import sys
 
 import numpy as np
 import pytest
-import lightning.pytorch as pl
+import lightning as L
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -288,7 +288,7 @@ def test_quick_training(synthetic_time_series):
     )
 
     # Create trainer
-    trainer = pl.Trainer(
+    trainer = L.Trainer(
         max_epochs=1,  # Just one epoch for testing
         accelerator="cpu",
         devices=1,

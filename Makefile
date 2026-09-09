@@ -15,13 +15,13 @@ setup:
 	$(UV) venv
 
 # Create a lockfile for dependencies
-lockdeps:
+lock:
 	@echo "Locking dependencies..."
 	$(UV) pip compile pyproject.toml
 	$(UV) lock
 
 # Install dependencies
-installdeps:
+dependencies:
 	@echo "Installing dependencies..."
 	$(UV) pip install -e .
 	$(UV) sync
