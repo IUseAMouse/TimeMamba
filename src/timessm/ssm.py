@@ -105,6 +105,12 @@ class S4DLayer(nn.Module):
         if s.numel() != batch:
             raise ValueError(f"delta_scale has {s.numel()} entries for a batch of {batch}")
         uniq, inv = torch.unique(s, return_inverse=True)
+        if uniq.numel() == 1:
+            # One scale for the whole batch (the training draw, the harness'
+            # per-bucket w): one kernel, one FFT of it - not B gathered copies
+            # (measured 2026-09-10: the gather + B FFTs of K made the pod run
+            # at 2.7 it/s).
+            return uniq, None
         return uniq, inv
 
     def discretize(self, delta_scale: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

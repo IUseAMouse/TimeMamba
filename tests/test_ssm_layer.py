@@ -142,6 +142,11 @@ def test_per_item_delta_scale_equals_loop():
         yb = layer(u[b:b + 1], delta_scale=float(scales[b]))
         assert torch.allclose(y[b:b + 1], yb, atol=1e-6, rtol=1e-5)
     assert torch.allclose(layer(u), layer(u, delta_scale=1.0))
+    # a uniform tensor collapses to the single-kernel path (no per-item gather)
+    uniq, inv = layer._scales(torch.full((5,), 0.5), 5)
+    assert uniq.numel() == 1 and inv is None
+    assert torch.allclose(layer(u, delta_scale=torch.full((5,), 0.5)),
+                          layer(u, delta_scale=0.5))
 
 
 # ------------------------------------------------------------- 5. bf16 autocast
