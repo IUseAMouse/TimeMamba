@@ -1,0 +1,155 @@
+# @package _global_
+# TimeSSM spike (2026-09-09): a ~3M linear time-invariant SSM with a Delta
+# (rate) knob, trained FROM SCRATCH on the pinball with the champion's recipe
+# (TimeJEPA lotsa_mini_v3_head8_zeroshot, resolved and COPIED here - no
+# cross-repo inheritance). One question, P-SSM.2: does the Delta knob recover
+# RateIN's margin without decimation or re-interpolation?
+#
+#   python scripts/train_ssm.py --config-name ssm_mini_v3 wandb.run_name=ssm-mini-v3
+#   # eval: scripts/eval_ssm.sh checkpoints/timessm_mini_v3_zs/pretrain_False/<ckpt> [flags]
+#
+# Predictions P-SSM.0-3 in docs/EXPERIMENTAL_LOG.md, graved before the run.
+#
+# Copied from the champion (resolved 2026-09-09): corpus lotsa_v3, rationing,
+# balanced sampling T 0.5 / cap 3, stride 8, context 1024 / horizon 256,
+# context-length randomization p 0.5, huber name (unused: the quantile head's
+# pinball is the loss), AdamW 3e-4 wd 0.02 betas (0.9, 0.95), cosine warmup
+# 0.1, 1 epoch, schedule_fraction 0.3 (anneal-30 arm), val every 5%, 300 val
+# batches, save every checkpoint, finetune augmentations (scale, jitter).
+#
+# DECLARED DEVIATIONS (bundle, not variables):
+#   * batch 128 x accumulate 3 = 384 per GPU step, 1152 effective like the
+#     champion: the FFT convolution over [B, 384 channels, 2 x 1280] does not
+#     fit 24 GB at batch 384.
+#   * encoder_lr_multiplier 1.0: no pretrained encoder, a single LR.
+#   * multi-rate training on Delta (delta_scales / p_delta_scale): the SSM's
+#     counterpart of the multi-resolution decimation - makes every w = 1/k the
+#     eval will ask for in-distribution. Witness aug/delta_scale.
+#   * d_conv 0: a depthwise conv is a filter in steps, not physical time, and
+#     would break the exact rate transfer (tests/test_ssm_layer.py).
+
+model:
+  name: "timessm_mini_v3_zs"
+  builder: "timessm.model:build_from_config"   # read by TimeJEPA's create_model_from_config
+  seq_length: 1024
+  prediction_length: 256
+  num_channels: 1
+  patch_length: 1          # informational: the model tokenizes per step
+  stride: 1
+  robust_scale: true
+  revin_affine: false
+  ssm:
+    d_model: 192
+    n_layers: 6
+    d_state: 32
+    expand: 2
+    d_conv: 0
+    dropout: 0.1
+    selective_readout: false   # ablation arm P-SSM.3
+    real: false                # S4D-Lin complex state
+    dt_min: 0.001
+    dt_max: 0.1
+  decoder:
+    type: "quantile"
+    quantile_hidden_dim: 1536
+    quantile_use_context: true
+
+training:
+  mode: "finetune"
+  finetune_mode: "full_finetune"
+  unfreeze_after_epoch: 1
+  context_lengths: [128, 192, 256, 384, 512, 640, 768, 1024]
+  p_random_context_finetune: 0.5
+  delta_scales: [0.25, 0.5, 1.0, 2.0, 4.0]
+  p_delta_scale: 0.5
+  loss:
+    finetune_type: "huber"
+  optimizer:
+    name: "adamw"
+    learning_rate: 3.0e-4
+    weight_decay: 0.02
+    betas: [0.9, 0.95]
+    eps: 1.0e-8
+    encoder_lr_multiplier: 1.0
+  lr_scheduler:
+    type: "cosine"
+    warmup_epochs: 0.1
+    min_lr: 1.0e-6
+  max_epochs: 1
+  schedule_fraction: 0.3
+  dropout: 0.1
+  gradient_clip_val: 1.0
+  log_every_n_steps: 50
+
+data:
+  data_dir: "../TimeJEPA/data/processed/lotsa_v3"
+  checkpoint_dir: "checkpoints/"
+  output_dir: "lightning/"
+  datasets_finetune: null
+  dataset_pattern: "*.npy"
+  combine_mode: "concatenate"
+  batch_size: 128
+  stride: 8
+  normalize_mode: "global"
+  normalizer_type: "identity"
+  clip_outliers: false
+  clip_sigma: 5.0
+  balanced_sampling: true
+  sampling_temperature: 0.5
+  max_oversample_ratio: 3.0
+  ration_oversample: true
+  train_val_test_split: [0.96, 0.02, 0.02]
+  seed: 420
+  num_workers: 8
+  persistent_workers: false
+  use_mmap: true
+
+augmentations:
+  finetune:
+    enabled: true
+    scale_enabled: true
+    scale_range: [0.9, 1.15]
+    p_scale: 0.3
+    jitter_enabled: true
+    jitter_std: 0.01
+    p_jitter: 0.1
+    magnitude_warp_enabled: false
+    drs_enabled: false
+    trend_enabled: false
+
+checkpoint:
+  monitor: "val_loss"
+  mode: "min"
+  save_top_k: -1
+  save_last: true
+  filename: "epoch{epoch:02d}_valloss{val_loss:.4f}"
+  auto_insert_metric_name: false
+
+early_stopping:
+  enabled: false
+  monitor: "val_loss"
+  patience: 25
+  mode: "min"
+  min_delta: 0.0001
+
+trainer:
+  accelerator: "auto"
+  devices: -1
+  precision: "bf16-mixed"
+  max_epochs: ${training.max_epochs}
+  gradient_clip_val: ${training.gradient_clip_val}
+  accumulate_grad_batches: 3
+  val_check_interval: 0.05
+  limit_val_batches: 300
+  limit_train_batches: null
+  log_every_n_steps: ${training.log_every_n_steps}
+  deterministic: false
+  strategy: "ddp_find_unused_parameters_true"
+  use_distributed_sampler: false
+
+wandb:
+  project: "TimeJEPA"
+  entity: "iuseamouse"
+  run_name: null
+  tags: ["timessm", "ssm", "lti", "delta-knob", "lotsa", "v3", "scratch", "mini", "robust-scale"]
+  log_model: false
