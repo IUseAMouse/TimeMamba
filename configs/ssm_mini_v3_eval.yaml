@@ -1,0 +1,16 @@
+# @package _global_
+# Eval of the TimeSSM spike checkpoints on GIFT-Eval through the TimeJEPA
+# harness (RateIN, mix, flip, and the new +ratein=delta). Same architecture
+# keys as ssm_mini_v3 (the builder rebuilds the model from them), own name
+# so results land in evaluation/timessm_mini_v3_zs/.
+#
+#   scripts/eval_ssm.sh checkpoints/timessm_mini_v3_zs/pretrain_False/<ckpt> +ratein=delta
+defaults:
+  - ssm_mini_v3
+  - _self_
+
+model:
+  name: "timessm_mini_v3_zs"
+
+wandb:
+  tags: ["timessm", "ssm", "lti", "delta-knob", "eval", "v3"]
