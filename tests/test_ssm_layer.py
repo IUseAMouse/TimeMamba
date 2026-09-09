@@ -142,3 +142,22 @@ def test_per_item_delta_scale_equals_loop():
         yb = layer(u[b:b + 1], delta_scale=float(scales[b]))
         assert torch.allclose(y[b:b + 1], yb, atol=1e-6, rtol=1e-5)
     assert torch.allclose(layer(u), layer(u, delta_scale=1.0))
+
+
+# ------------------------------------------------------------- 5. bf16 autocast
+def test_forward_under_bf16_autocast_matches_float32():
+    """bf16-mixed training (the pod's precision) crashed in the FFT: cuFFT has
+    no bfloat16 kernel and autocast leaves fft ops alone. The layer now runs
+    its convolution in float32 whatever the ambient precision."""
+    layer = _layer(d_model=8, d_state=8, dtype=torch.float32)
+    torch.manual_seed(5)
+    u = torch.randn(2, 128, 8)
+    ref = layer(u, delta_scale=1.0)
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        y = layer(u.to(torch.bfloat16), delta_scale=1.0)
+    assert y.dtype == torch.bfloat16
+    assert torch.allclose(y.float(), ref, atol=5e-2, rtol=5e-2)
+    block = GatedSSMBlock(d_model=8, d_state=8, expand=2, d_conv=0, dropout=0.0)
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        out = block(u, delta_scale=torch.tensor([0.5, 2.0]))
+    assert torch.isfinite(out).all()

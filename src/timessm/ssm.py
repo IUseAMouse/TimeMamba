@@ -134,13 +134,18 @@ class S4DLayer(nn.Module):
         scales, inv = self._scales(delta_scale, B)
         K = self.kernel(L, scales)                                 # [U, H, L]
         K = K[inv] if inv is not None else K                       # [B|1, H, L]
-        u_t = u.transpose(1, 2)                                    # [B, H, L]
+        # cuFFT has no bfloat16 path and autocast does not cast fft ops: the
+        # convolution runs in float32 whatever the surrounding precision
+        # (bf16-mixed training crashed here, 2026-09-10) and returns in the
+        # input dtype.
+        fft_dtype = torch.float32 if u.dtype in (torch.bfloat16, torch.float16) else u.dtype
+        u_t = u.transpose(1, 2).to(fft_dtype)                      # [B, H, L]
         n_fft = 2 * L
         y = torch.fft.irfft(
-            torch.fft.rfft(u_t, n=n_fft) * torch.fft.rfft(K, n=n_fft), n=n_fft
+            torch.fft.rfft(u_t, n=n_fft) * torch.fft.rfft(K.to(fft_dtype), n=n_fft), n=n_fft
         )[..., :L]
-        y = y + self.D[None, :, None] * u_t
-        return y.transpose(1, 2)
+        y = y + self.D[None, :, None].to(fft_dtype) * u_t
+        return y.transpose(1, 2).to(u.dtype)
 
     # ------------------------------------------------------------ recurrence
     def init_state(self, batch: int, dtype=None, device=None) -> torch.Tensor:
