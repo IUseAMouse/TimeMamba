@@ -75,3 +75,4 @@ checkpoints/
 logs/
 wandb/
 evaluation/
+outputs/

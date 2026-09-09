@@ -1,3 +1,7 @@
+# DEPRECATED (2026-09) - see src/timessm/. This file is the March 2025 Mamba
+# attempt, kept as is (no-delete policy): its "selective" SSM is a static LTI
+# scan whose divide-by-A^i recurrence is unstable at long lengths. It runs on
+# the `legacy` extra (uv sync --extra legacy).
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import MLFlowLogger
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
