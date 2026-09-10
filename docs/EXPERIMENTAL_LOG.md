@@ -5,6 +5,22 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-10 (PREMIER RUN INVALIDE : schedule étiré ×3 par l'accumulation ; correctifs
+  bf16 et vitesse ; run à relancer)** — Trois problèmes rencontrés au lancement sur le pod,
+  tous corrigés et poussés : (1) `bf16-mixed` plante dans la FFT (cuFFT sans noyau
+  bfloat16, autocast ne convertit pas les FFT) → convolution en float32 sous autocast
+  (`4ed7a73`) ; (2) 2.7 it/s : un `w` uniforme par batch était traité comme « un Δ par item »,
+  noyau dupliqué 128× et 128 FFT du noyau par bloc → chemin à noyau unique (`e568a5d`),
+  5.3 it/s ensuite ; (3) le scheduler de TimeJEPA comptait des batchs alors qu'il avance par
+  pas d'optimiseur : avec `accumulate_grad_batches: 3`, warmup et cosinus ×3, TOUT le run
+  borné à 30 % était du warmup (LR 1.5e-5 au checkpoint 5 %, val 1.33, courbe `lr-AdamW` à
+  pente 1/3 du scratch head8) → corrigé côté TimeJEPA (`// accumulate`). Le checkpoint 5 %
+  de ce run ne mesure pas l'architecture ; son éval (stack, 24 configs vues : bitbrains
+  0.47-0.88, electricity/15T 0.086) n'est pas retenue. Vitesse : le SSM à un token par pas
+  coûte ~6× TimeJEPA par échantillon (1280 tokens contre 127 patchs, FFT bornée par la
+  mémoire) ; le verdict P-SSM.2 se lit au checkpoint 5 % (~6 h à 5.3 it/s), le run à 30 %
+  (~5 j) n'est engagé que si P-SSM.1 tient. Prédictions P-SSM.0-3 inchangées.
+
 - **2026-09-09 (TimeSSM SPIKE — CODE LIVRÉ, NON COURU ; P-SSM.0 TENUE : l'équivariance
   au rythme passe à 1e-8)** — Branche `timessm` de TimeMamba, dépendance éditable sur
   TimeJEPA (aucune copie de code hors les 8 lignes d'`apply_schedule_fraction` et le bloc
