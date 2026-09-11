@@ -34,7 +34,7 @@ mkdir -p "$HERE/logs"
 DIGEST="$HERE/logs/eval_${RUN}${TAG}.log"
 echo "== $(date '+%F %T') run=$RUN flags: ${STACK_ARR[*]} ${EXTRA[*]:-}" | tee -a "$DIGEST"
 
-mapfile -t CKPTS < <(ls -tr "$DIR"/*.ckpt 2>/dev/null | grep -v '/last\.ckpt$')
+mapfile -t CKPTS < <(ls -tr "$DIR"/*.ckpt 2>/dev/null | grep -v '/last[^/]*\.ckpt$')
 if [ ${#CKPTS[@]} -eq 0 ]; then
   echo "no checkpoint in $DIR" | tee -a "$DIGEST"; exit 1
 fi
@@ -50,14 +50,17 @@ for CK in "${CKPTS[@]}"; do
   [ $RC -ne 0 ] && echo "   exit $RC (see $LOG)" | tee -a "$DIGEST"
   LINE=$(grep "vs_official_seasonal_naive" "$LOG" | tail -1 | sed -E 's/.*MASE ratio ([0-9.]+) \| CRPS ratio ([0-9.]+).*/\1 \2/')
   COV=$(grep "coverage (mean" "$LOG" | tail -1 | sed -E 's/.*-> ([0-9.]+).*/\1/')
-  ROWS+=("$STEM ${LINE:-nan nan} ${COV:-nan}")
+  NCFG=$(grep "coverage (mean" "$LOG" | tail -1 | sed -E 's/.*mean over ([0-9]+) configs.*/\1/')
+  ROWS+=("$STEM ${LINE:-nan nan} ${COV:-nan} ${NCFG:-0}")
 done
 {
   echo "== table run=$RUN flags: ${STACK_ARR[*]} ($(date '+%F %T'))"
-  printf "%-36s %8s %8s %8s\n" checkpoint MASE CRPS cov80
+  printf "%-36s %8s %8s %8s %6s\n" checkpoint MASE CRPS cov80 n_cfg
   for r in "${ROWS[@]}"; do
     set -- $r
-    printf "%-36s %8s %8s %8s\n" "$1" "$2" "$3" "$4"
+    FLAG=""; [ "$5" != "97" ] && FLAG="*"
+    printf "%-36s %8s %8s %8s %5s%s\n" "$1" "$2" "$3" "$4" "$5" "$FLAG"
   done
   echo "reference TimeJEPA head8 champion stack: 0.7842 0.5340 0.756 (5%: 0.5585, scratch S4-c 5%: 0.5506)"
+  echo "* fewer than 97 configs: NOT comparable to the reference nor across rows (compare_subset.py)"
 } | tee -a "$DIGEST"
