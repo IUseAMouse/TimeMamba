@@ -5,6 +5,33 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-11 (P-SSM.2 ÉCHOUE sur le checkpoint 1.3022 : delta 0.8276 / 0.5558 contre
+  backtest 0.7953 / 0.5409, dur, sans flip, 97 configs ; DIAGNOSTIC MESURÉ : le bouton gagne
+  sur sa plage entraînée (k ≤ 8) et perd au-delà (k ≥ 16))** — Run corrigé (schedule),
+  checkpoint ~10 % du budget (val 1.3022). Sélecteur identique des deux côtés, pooling CRPS,
+  marge 5 %. Delta active le bouton sur 28 configs, la décimation sur 32. Par config
+  (`compare_subset.py`) : à k égal 16 (bizitobs_service ×3, bizitobs_application/long) delta
+  perd 11-23 % — à w = 1/16 le bouton est moins bon que la décimation par 16 ; là où delta
+  choisit un k énorme (sz_taxi 48, kdd/D 24, bizitobs_l2c/medium 32) le backtest accepte un w
+  que le test punit (winner's curse hors distribution) ; à k ≤ 8 des deux côtés delta gagne
+  (bitbrains_fast_storage/5T/long 0.606 contre 0.898, /medium 0.642 contre 0.691, bitbrains_rnd
+  /5T/long, solar/H/short, ett2/H où delta refuse à raison un k = 6 que la décimation accepte à
+  tort). Cause : `delta_scales` [0.25..4] n'entraîne le bouton que jusqu'à k = 4, le harnais
+  demande w jusqu'à 1/48 ; à Δ/48 les constantes de temps sont 48× hors de tout ce que le
+  modèle a vu, alors qu'un contexte décimé par 48 reste un contexte court à Δ, en
+  distribution. Deux suites : (1) garde `+ratein_delta_max_k=N` dans le harnais (bouton
+  jusqu'à N, décimation au-delà, même sélecteur ; livrée, test stub), à mesurer sur 1.3022 à
+  N = 4 et 8 ; (2) second bras d'entraînement, `delta_scales` sur toute la plage demandée
+  (1/48 à 4). Aussi : P-SSM.1 encore à lire sur 97 (stack complet sur 55 : 0.5045 contre
+  0.5041 pour le champion sur les mêmes configs — égalité, pas domination ; les 42 manquantes
+  sont les longues, tombées en OOM pendant le run). Vitesse : m4_monthly et
+  temperature_rain dominent l'éval (48k et 96k instances), batch 64 puis 8.
+
+  **P-SSM.2b** (hybride, même checkpoint) : `+ratein=delta +ratein_delta_max_k=4` bat
+  `+ratein=backtest` d'au moins 0.3 pt de CRPS ; N = 8 dans le bruit de N = 4. ÉCHEC si
+  l'hybride ≤ backtest : le bouton n'apporte rien même sur sa plage, et la décimation
+  reste la couche officielle.
+
 - **2026-09-10 (PREMIER RUN INVALIDE : schedule étiré ×3 par l'accumulation ; correctifs
   bf16 et vitesse ; run à relancer)** — Trois problèmes rencontrés au lancement sur le pod,
   tous corrigés et poussés : (1) `bf16-mixed` plante dans la FFT (cuFFT sans noyau
