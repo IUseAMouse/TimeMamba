@@ -38,9 +38,15 @@ scripts/eval_ssm.sh $CK +ratein=oracle                                  # table 
 ```
 
 Résultats dans `evaluation/timessm_mini_v3_zs/<ckpt>/gift<tag>/` (cache par
-config, comme TimeJEPA). Tous les checkpoints d'un run :
-`../TimeJEPA/scripts/eval_checkpoints.sh` attend une config TimeJEPA ; utiliser
-une boucle sur `scripts/eval_ssm.sh` (ordre `ls -tr`).
+config, comme TimeJEPA). Tous les checkpoints d'un run, en série, digest et
+table dans `logs/` :
+
+```bash
+scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mini_v3_zs/pretrain_False            # stack officiel
+STACK="+ratein=backtest +ratein_pool=true" scripts/eval_checkpoints_ssm.sh <dir>       # décimation dure
+STACK="+ratein=delta +ratein_pool=true" scripts/eval_checkpoints_ssm.sh <dir>          # le bouton
+scripts/eval_checkpoints_ssm.sh <dir> +gift_batch_size=8                                # pendant un run
+```
 
 Refus attendus : `+ratein_w` (pas de FiLM), `+refine`, `+ttt` (pas d'encodeur
 JEPA), `+ratein=delta` sur un modèle sans `rate_knob`.
