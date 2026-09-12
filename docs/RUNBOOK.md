@@ -48,6 +48,16 @@ STACK="+ratein=delta +ratein_pool=true" scripts/eval_checkpoints_ssm.sh <dir>   
 scripts/eval_checkpoints_ssm.sh <dir> +gift_batch_size=8                                # pendant un run
 ```
 
+## Bras à plage large (reprise du meilleur checkpoint, ~12 h)
+
+```bash
+python scripts/train_ssm.py --config-name ssm_mini_v3_wide \
+    '+training.pretrained_encoder_path="checkpoints/timessm_mini_v3_zs/pretrain_False/<best>.ckpt"' \
+    wandb.run_name=ssm-mini-v3-wide 2>&1 | tee logs/train_ssm_wide.log
+STACK="+ratein=delta +ratein_pool=true" scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mini_v3_wide_zs/pretrain_False
+STACK="+ratein=backtest +ratein_pool=true" scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mini_v3_wide_zs/pretrain_False
+```
+
 Refus attendus : `+ratein_w` (pas de FiLM), `+refine`, `+ttt` (pas d'encodeur
 JEPA), `+ratein=delta` sur un modèle sans `rate_knob`.
 

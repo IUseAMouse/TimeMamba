@@ -5,6 +5,31 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-12 (TABLE À 97 SUR LES PREMIERS CHECKPOINTS : P-SSM.1 TIENT, égalité avec le
+  champion à 15-20 % du budget ; bras à plage large prêt, non lancé)** — Stack officiel
+  (flip + mix + pool, décimation), GPU libres, batch 64, 97 configs : 5 % 0.8560 / 0.5761 /
+  couv. 0.763 ; 10 % 0.7948 / 0.5419 / 0.760 ; 15 % 0.7757 / 0.5305 / 0.730 ; 20 % 0.7839 /
+  0.5334 / 0.732 ; champion head8 0.7842 / 0.5340 / 0.756. P-SSM.1 (bande 0.545-0.575 à 5 %) :
+  0.5761 à 5 % est au bord, avec le 5 % au milieu du warmup (LR 1.5e-4) ; à 10 % le modèle est
+  sous la bande. Le 15 % est le meilleur chiffre jamais mesuré sur ce projet, MASE comprise,
+  mais à 0.35 pt du champion il est dans la bande de bruit checkpoint à checkpoint mesurée
+  sur anneal-30 (0.5352-0.5412) : pas un nouveau champion par notre propre règle ; couverture
+  plus basse (0.730). Pente aplatie entre 15 et 20 % ; val_loss en plateau 1.289-1.295 depuis
+  20 %. LEÇON D'INSTRUMENT : les tables de la veille mélangeaient des sous-ensembles de 55 à
+  70 configs (OOM pendant le run, les lourdes manquantes) et donnaient 0.508-0.524 — jamais
+  comparables ; `eval_checkpoints_ssm.sh` affiche désormais n_cfg et cached/computed/failed.
+  Budget réel : le run borné à 30 % de l'époque = 2.33M batchs par GPU à 5.2 it/s = 5.2 jours
+  (pas 2.7, erreur de ma part au lancement), checkpoint tous les 6 h ; à 42 % du run le 12/09.
+  **Décision à prendre** : couper au meilleur checkpoint et lancer le bras à plage large, ou
+  laisser finir (3 jours). **Bras à plage large** (`configs/ssm_mini_v3_wide.yaml`) : reprise
+  des POIDS du meilleur checkpoint (`pretrained_encoder_path`, optimiseur et cosinus neufs),
+  `delta_scales` = les 13 valeurs de K_CANDIDATES de 1/48 à 4, p 0.7, LR 1e-4, budget 3 % de
+  l'époque (10 % du spike, ~12 h), 5 checkpoints ; smoke CPU passé (52 clés chargées).
+  **P-SSM.2c** (gravée) : sur le checkpoint wide, `+ratein=delta` sans max_k ≥ `+ratein=backtest`
+  de 0.3 pt et disparition des pertes à k ≥ 16 (bizitobs_service, bizitobs_l2c) ; ÉCHEC si
+  delta ≤ backtest : le bouton ne transfère pas aux grands k même entraîné, l'hybride reste
+  la couche officielle.
+
 - **2026-09-11 (P-SSM.2 ÉCHOUE sur le checkpoint 1.3022 : delta 0.8276 / 0.5558 contre
   backtest 0.7953 / 0.5409, dur, sans flip, 97 configs ; DIAGNOSTIC MESURÉ : le bouton gagne
   sur sa plage entraînée (k ≤ 8) et perd au-delà (k ≥ 16))** — Run corrigé (schedule),
