@@ -48,6 +48,8 @@ for CK in "${CKPTS[@]}"; do
   grep -E "vs_official_seasonal_naive|vs_local_seasonal_naive|coverage \(mean|RateIN:|Results:" "$LOG" \
     | sed -E 's/.*INFO\] - //' | tee -a "$DIGEST"
   [ $RC -ne 0 ] && echo "   exit $RC (see $LOG)" | tee -a "$DIGEST"
+  CACHED=$(grep -c "already done" "$LOG"); FAILED=$(grep -c "FAILED:" "$LOG")
+  echo "   configs: $CACHED cached, $((97 - CACHED - FAILED)) computed, $FAILED failed" | tee -a "$DIGEST"
   LINE=$(grep "vs_official_seasonal_naive" "$LOG" | tail -1 | sed -E 's/.*MASE ratio ([0-9.]+) \| CRPS ratio ([0-9.]+).*/\1 \2/')
   COV=$(grep "coverage (mean" "$LOG" | tail -1 | sed -E 's/.*-> ([0-9.]+).*/\1/')
   NCFG=$(grep "coverage (mean" "$LOG" | tail -1 | sed -E 's/.*mean over ([0-9]+) configs.*/\1/')
