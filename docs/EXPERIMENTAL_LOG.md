@@ -5,6 +5,20 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (P-SSM.2b NE SE RÉPLIQUE PAS sur 1.2850 : hybride k ≤ 4 0.7920 / 0.5471 / couv.
+  0.725 contre backtest dur 0.7901 / 0.5475 / 0.720 — 0.04 pt, bruit)** — Bilan sur deux
+  checkpoints : +0.47 pt (1.2942), +0.04 pt (1.2850). Le bouton sur sa plage entraînée n'est
+  pas un gain établi : match nul avec la décimation. Même dessin par config (gains à k ≤ 4
+  par le bouton : electricity/15T/short 0.103 vs 0.112, ett1/15T/long, m_dense/H/medium ;
+  pertes quand l'hybride glisse vers une grosse décimation : bizitobs_service/short k32,
+  saugeen/D k24, solar/10T/medium k8 0.369 vs 0.326, ett1/H/long k6). Le checkpoint plus
+  entraîné change de cadence moins souvent (35/97 contre 41/97) : le gain du rythme
+  décroît avec l'entraînement, bouton comme décimation. À conditions identiques, 1.2942
+  reste devant 1.2850 (0.5445 contre 0.5475 en backtest dur) : les 0.7689 de MASE du stack
+  sur 1.2850 viennent des couches, pas du checkpoint ; champion inchangé. Wide est le
+  dernier test du bouton (P-SSM.2c gravée) ; en cas d'échec, la ligne du papier est un
+  résultat négatif propre : le corps LTI tient, le bouton ne bat pas la décimation.
+
 - **2026-09-13 (P-SSM.2b TIENT sur le champion 1.2942 : hybride bouton k ≤ 4 + décimation
   au-delà 0.7906 / 0.5398 / couv. 0.765 contre backtest dur 0.7892 / 0.5445 / 0.768, dur, sans
   flip, 97 configs : CRPS −0.47 pt (seuil 0.3), MASE +0.14 dans le bruit)** — Sur sa plage
