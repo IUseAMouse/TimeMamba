@@ -5,6 +5,20 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (NOUVEAU CHAMPION : `epoch00_valloss1.2942` (25 % du run), stack flip + mix +
+  pool, 0.7717 / 0.5282 / couverture 0.805 sur 97 configs, contre head8 0.7842 / 0.5340 /
+  0.756)** — Table à 97 : 5 % 0.5761, 10 % 0.5419, 15 % 0.5305, 20 % 0.5334, 25 % 0.5282.
+  Trois checkpoints consécutifs à ou sous le champion ; le 25 % gagne sur les trois axes,
+  MASE −1.25 pt, CRPS −0.58 pt (au bord de la bande de bruit, 0.6 pt), couverture +4.9 pt —
+  c'est la MASE et la couverture qui sortent le verdict du doute, pas le CRPS seul. Un
+  scratch LTI de 2.5M, sans pretrain, sans attention dans le corps, sans conv, à un quart de
+  son budget, à inférence strictement identique (RateIN par décimation, sans le bouton).
+  Lecture : sur ce corpus le prior « état continu + horloge » vaut plus que l'attention ; le
+  pretrain JEPA (≈ 1 pt) n'était pas ce qui manquait. Réserves : 30-45 % encore sur des
+  sous-ensembles (71-74 configs, OOM d'une éval parallèle), à compléter ; couverture à
+  suivre (0.679-0.720 sur les sous-ensembles suivants). Suite : passe complète 30-45 %,
+  série delta-k4 par checkpoint, bras wide depuis le meilleur.
+
 - **2026-09-12 (TABLE À 97 SUR LES PREMIERS CHECKPOINTS : P-SSM.1 TIENT, égalité avec le
   champion à 15-20 % du budget ; bras à plage large prêt, non lancé)** — Stack officiel
   (flip + mix + pool, décimation), GPU libres, batch 64, 97 configs : 5 % 0.8560 / 0.5761 /
