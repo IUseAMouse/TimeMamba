@@ -5,6 +5,19 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (TABLE COMPLÈTE À 97 SUR 11 CHECKPOINTS, 5 % à 55 % du run : PLATEAU à
+  0.528-0.533 depuis 25 % ; champion inchangé `1.2942` ; décision de couper le run)** —
+  Stack flip + mix + pool : 5 % 0.5761 · 10 % 0.5419 · 15 % 0.5305 · 20 % 0.5334 · 25 %
+  **0.5282** (0.7717, couv. 0.805) · 30 % 0.5301 · 35 % 0.5311 · 40 % 0.5292 · 45 % 0.5296 ·
+  50 % 0.5278 (0.7762, couv. 0.719) · 55 % 0.5289 (0.7689, couv. 0.729). Huit checkpoints
+  consécutifs sous ou au niveau de head8 (0.5340). Le 50 % gagne 0.04 pt de CRPS sur le
+  25 % et lui perd 0.45 pt de MASE et 8.6 pt de couverture : même bande, le 25 % reste le
+  champion (seul à gagner sur les trois axes). Couverture en dérive descendante depuis 25 %
+  (0.805 → 0.66-0.73, la pinball resserre le fan), à traiter au papier comme limite
+  partagée avec le transformer. Les 45 % restants (2.3 j) sont la fin du cosinus, sans gain
+  attendu (anneal-30) : run coupé, GPU au bras wide-Δ depuis le dernier checkpoint (1.2850,
+  le plus entraîné), P-SSM.2c gravée plus haut.
+
 - **2026-09-13 (PRÉPARATION DU SCALING : checkpointing d'activations et option FSDP, code
   livré, non couru sur GPU)** — Décision utilisateur : après le verdict wide et un second
   seed, scaler TimeSSM sur un pod loué (8× RTX 5090, ~1 $/h/GPU). À un token par pas, la
