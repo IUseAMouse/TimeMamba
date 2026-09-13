@@ -5,6 +5,19 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (P-SSM.2b TIENT sur le champion 1.2942 : hybride bouton k ≤ 4 + décimation
+  au-delà 0.7906 / 0.5398 / couv. 0.765 contre backtest dur 0.7892 / 0.5445 / 0.768, dur, sans
+  flip, 97 configs : CRPS −0.47 pt (seuil 0.3), MASE +0.14 dans le bruit)** — Sur sa plage
+  entraînée [1/4, 4], le bouton bat la décimation. Par config : gains là où le sélecteur
+  prend le bouton à k ≤ 4 (m_dense/H/medium k4 vs 2 : 0.129 vs 0.147 ; us_births/D k3 vs 1 ;
+  jena/H/long k3 vs 2 ; electricity/15T/short k4 vs 4 : 0.099 vs 0.109 ; solar/H/short k3
+  vs 2), pertes là où l'hybride glisse vers une grosse décimation que le backtest pur ne
+  prenait pas (solar/10T/medium k12 vs 3 : 0.376 vs 0.329 ; kdd/H/long k8 vs 3 ; bizitobs_l2c
+  k6-8 vs 2-4) — la table mixte bouton / décimation déplace le winner's curse. Le stack
+  flip + mix vaut 1.6 pt sur ce checkpoint (0.5445 → 0.5282), même ordre que sur TimeJEPA.
+  Décision : pas de mode supplémentaire dans le harnais ; wide (bouton sur toute la plage,
+  plus de candidats décimés) est le test propre. Second checkpoint (1.2850) en cours.
+
 - **2026-09-13 (TABLE COMPLÈTE À 97 SUR 11 CHECKPOINTS, 5 % à 55 % du run : PLATEAU à
   0.528-0.533 depuis 25 % ; champion inchangé `1.2942` ; décision de couper le run)** —
   Stack flip + mix + pool : 5 % 0.5761 · 10 % 0.5419 · 15 % 0.5305 · 20 % 0.5334 · 25 %
