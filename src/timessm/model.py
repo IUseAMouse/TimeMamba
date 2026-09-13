@@ -31,6 +31,7 @@ from typing import Dict, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
+import torch.utils.checkpoint
 
 from timejepa.models.components.patching import Patching
 from timejepa.models.components.revin import RevIN
@@ -67,6 +68,7 @@ class SSMForecaster(nn.Module):
         quantile_use_context: bool = True,
         robust_scale: bool = True,
         revin_affine: bool = False,
+        activation_checkpointing: bool = False,
         name: str = "timessm",
     ):
         super().__init__()
@@ -74,6 +76,7 @@ class SSMForecaster(nn.Module):
         self.input_length = int(input_length)
         self.prediction_length = int(prediction_length)
         self.d_model = int(d_model)
+        self.activation_checkpointing = bool(activation_checkpointing)
         # One token per step: Linear(1 -> D). No padding: prepare_context in
         # the harness aligns lengths on stride = 1, i.e. never truncates.
         self.patching = Patching(patch_size=1, d_model=d_model, num_features=1,
@@ -108,8 +111,17 @@ class SSMForecaster(nn.Module):
         tokens = self.patching(context_norm)                          # [B, L, D]
         future = self.future_token.reshape(1, 1, -1).expand(B, n, -1)
         h = torch.cat([tokens, future], dim=1)                        # [B, L+n, D]
+        # Activation checkpointing (scaling, 2026-09-13): the per-step tokens
+        # make activations, not parameters, the memory limit (batch x 1280 x
+        # 2 d_model x blocks); recomputing each block's forward in backward
+        # trades ~30% compute for a block's worth of activations. Train only.
+        use_ckpt = self.activation_checkpointing and self.training and torch.is_grad_enabled()
         for block in self.blocks:
-            h = block(h, delta_scale=delta_scale)
+            if use_ckpt:
+                h = torch.utils.checkpoint.checkpoint(
+                    block, h, delta_scale, use_reentrant=False)
+            else:
+                h = block(h, delta_scale=delta_scale)
         h = self.final_norm(h)
         return h[:, :L], h[:, L:]
 
@@ -255,5 +267,6 @@ def build_from_config(cfg) -> SSMForecaster:
         quantile_use_context=bool(cfg.model.decoder.get("quantile_use_context", True)),
         robust_scale=bool(cfg.model.get("robust_scale", True)),
         revin_affine=bool(cfg.model.get("revin_affine", False)),
+        activation_checkpointing=bool(s.get("activation_checkpointing", False)),
         name=cfg.model.name,
     )

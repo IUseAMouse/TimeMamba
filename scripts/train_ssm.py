@@ -47,6 +47,27 @@ def apply_schedule_fraction(trainer_kwargs: dict, cfg) -> dict:
     return trainer_kwargs
 
 
+def build_strategy(cfg: DictConfig):
+    """`trainer.strategy`: any Lightning string as before, or "fsdp" - Fully
+    Sharded Data Parallel (weights, gradients and optimizer states sharded
+    across ranks, the ZeRO-3 layout), one FSDP unit per GatedSSMBlock, full
+    (single-file) checkpoints so the GIFT harness loads them unchanged,
+    activation checkpointing per block when model.ssm.activation_checkpointing
+    is set. At the spike's sizes (2.5-20M) FSDP is not needed - DDP holds the
+    optimizer states with room to spare - it is here for the scaling runs and
+    tested on a real multi-GPU job before being claimed anywhere."""
+    name = str(cfg.trainer.strategy)
+    if name.lower() != "fsdp":
+        return name
+    from pytorch_lightning.strategies import FSDPStrategy
+    from timessm.block import GatedSSMBlock
+    kwargs = dict(auto_wrap_policy={GatedSSMBlock}, sharding_strategy="FULL_SHARD",
+                  state_dict_type="full")
+    if bool(cfg.model.ssm.get("activation_checkpointing", False)):
+        kwargs["activation_checkpointing_policy"] = {GatedSSMBlock}
+    return FSDPStrategy(**kwargs)
+
+
 def build_datamodule(cfg: DictConfig) -> MultiDatasetMonashDataModule:
     """TimeJEPA/scripts/train.py datamodule block, finetune branch."""
     aug_root = cfg.get("augmentations") or {}
@@ -174,7 +195,7 @@ def main(cfg: DictConfig):
         val_check_interval=cfg.trainer.val_check_interval,
         log_every_n_steps=cfg.trainer.log_every_n_steps,
         callbacks=callbacks, default_root_dir=cfg.data.output_dir,
-        deterministic=cfg.trainer.deterministic, strategy=cfg.trainer.strategy,
+        deterministic=cfg.trainer.deterministic, strategy=build_strategy(cfg),
         use_distributed_sampler=cfg.trainer.use_distributed_sampler,
     )
     for key in ("limit_train_batches", "limit_val_batches"):

@@ -155,3 +155,51 @@ def test_multirate_module_refuses_bad_config():
     with pytest.raises(ValueError):
         SSMFinetuneModule(m, finetune_mode="full_finetune", delta_scales=[0.0, 1.0],
                           p_delta_scale=0.5)
+
+
+# ------------------------------------------------------------- 7. scaling knobs
+def test_activation_checkpointing_same_numbers_train_only():
+    """Recomputing the blocks in backward must change nothing: same forward,
+    same gradients (float64), and it is inert in eval."""
+    m = _small(activation_checkpointing=True).double()
+    ref = _small().double()
+    ref.load_state_dict(m.state_dict())
+    x = _ctx(B=2).double()
+    m.train(); ref.train()
+    # the quantile head keeps its own dropout in train mode: same seed, same masks
+    torch.manual_seed(11); a = m.forecast(x, n=16)["quantiles"]
+    torch.manual_seed(11); b = ref.forecast(x, n=16)["quantiles"]
+    assert torch.allclose(a, b, atol=1e-10)
+    a.sum().backward(); b.sum().backward()
+    n_checked = 0
+    for (n1, p1), (n2, p2) in zip(m.named_parameters(), ref.named_parameters()):
+        assert n1 == n2
+        if p1.grad is None or p2.grad is None:          # Patching.value_embedding is unused
+            assert p1.grad is None and p2.grad is None, n1
+            continue
+        assert torch.allclose(p1.grad, p2.grad, atol=1e-8), n1
+        n_checked += 1
+    assert n_checked > 10
+    m.eval(); ref.eval()
+    with torch.no_grad():
+        assert torch.allclose(m.forecast(x, n=16)["quantiles"],
+                              ref.forecast(x, n=16)["quantiles"], atol=1e-10)
+
+
+def test_strategy_builder_fsdp():
+    import sys as _sys
+    from pathlib import Path as _P
+    _sys.path.insert(0, str(_P(__file__).resolve().parents[1] / "scripts"))
+    from omegaconf import OmegaConf
+    from train_ssm import build_strategy
+    from pytorch_lightning.strategies import FSDPStrategy
+    from timessm.block import GatedSSMBlock
+    plain = OmegaConf.create({"trainer": {"strategy": "ddp"}, "model": {"ssm": {}}})
+    assert build_strategy(plain) == "ddp"
+    cfg = OmegaConf.create({"trainer": {"strategy": "fsdp"},
+                            "model": {"ssm": {"activation_checkpointing": True}}})
+    st = build_strategy(cfg)
+    assert isinstance(st, FSDPStrategy)
+    assert st.kwargs["auto_wrap_policy"]._module_classes == {GatedSSMBlock}
+    assert str(st.sharding_strategy).endswith("FULL_SHARD")
+    assert st._activation_checkpointing_kwargs["auto_wrap_policy"]._module_classes == {GatedSSMBlock}

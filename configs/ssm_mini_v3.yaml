@@ -49,6 +49,7 @@ model:
     real: false                # S4D-Lin complex state
     dt_min: 0.001
     dt_max: 0.1
+    activation_checkpointing: false   # scaling: recompute each block in backward (activations are the memory limit)
   decoder:
     type: "quantile"
     quantile_hidden_dim: 1536

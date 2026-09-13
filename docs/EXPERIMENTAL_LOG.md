@@ -5,6 +5,21 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (PRÉPARATION DU SCALING : checkpointing d'activations et option FSDP, code
+  livré, non couru sur GPU)** — Décision utilisateur : après le verdict wide et un second
+  seed, scaler TimeSSM sur un pod loué (8× RTX 5090, ~1 $/h/GPU). À un token par pas, la
+  mémoire est dans les activations (batch × 1280 × 2·d_model × blocs), pas dans les poids :
+  `model.ssm.activation_checkpointing` recompute chaque bloc en backward (train seulement,
+  inerte en eval ; test : mêmes sorties et mêmes gradients en float64). `trainer.strategy:
+  fsdp` construit une `FSDPStrategy` (FULL_SHARD, un unit par `GatedSSMBlock`, checkpoints
+  en un fichier pour le harnais, policy de checkpointing si demandée) ; test de
+  construction seulement, la validation multi-GPU se fait sur le pod avant toute mention
+  au CV. Budget chiffré (registre TimeJEPA du jour) : un 10M à exposition du champion SSM
+  ≈ 15 h ≈ 120 $ sur 8× 5090, un 20M le double ; un 100M à un token par pas n'entre pas
+  dans 1 000 $ (≈ 5 j de 8× H100) sans patcher, ce qui casserait le bouton Δ. Corpus v3
+  reconstructible par `../TimeJEPA/scripts/build_corpus_v3.sh` (révisions HF épinglées,
+  audit 106 fichiers / 15.85 Md).
+
 - **2026-09-13 (CORRECTION D'ÉCHELLE : les « % » des checkpoints SSM sont des % du RUN borné à
   30 %, pas de l'époque ; le champion « 25 % » est à 7.5 % de l'époque, 223M fenêtres, contre
   746M pour head8 à 25 % de l'époque)** — L'époque du sampler vaut 2.98 Md de fenêtres quel

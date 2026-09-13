@@ -61,6 +61,20 @@ STACK="+ratein=backtest +ratein_pool=true" scripts/eval_checkpoints_ssm.sh check
 Refus attendus : `+ratein_w` (pas de FiLM), `+refine`, `+ttt` (pas d'encodeur
 JEPA), `+ratein=delta` sur un modèle sans `rate_knob`.
 
+## Scaling : FSDP et checkpointing d'activations (2026-09-13)
+
+```bash
+# DDP + recompute des blocs en backward (la mémoire est dans les activations, pas les poids)
+python scripts/train_ssm.py --config-name ssm_mini_v3 model.ssm.activation_checkpointing=true ...
+# FSDP (poids, gradients, états Adam shardés ; un unit par bloc ; checkpoints en un fichier)
+python scripts/train_ssm.py --config-name ssm_mini_v3 trainer.strategy=fsdp model.ssm.activation_checkpointing=true ...
+```
+
+À 2.5-20M, DDP suffit (Adam fp32 = 16 octets/paramètre, 320 Mo à 20M) ; FSDP est là pour
+au-delà, et n'est revendiqué qu'après un vrai run multi-GPU. Le checkpointing coûte ~30 % de
+calcul et divise la mémoire d'activations par le nombre de blocs. Pod 8× 5090 : 15 vCPU pour
+8 processus, mettre `data.num_workers=1`.
+
 ## Doctrine
 
 Une variable par bras, prédictions gravées dans `docs/EXPERIMENTAL_LOG.md`
