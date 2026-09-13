@@ -5,6 +5,22 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-13 (CORRECTION D'ÉCHELLE : les « % » des checkpoints SSM sont des % du RUN borné à
+  30 %, pas de l'époque ; le champion « 25 % » est à 7.5 % de l'époque, 223M fenêtres, contre
+  746M pour head8 à 25 % de l'époque)** — L'époque du sampler vaut 2.98 Md de fenêtres quel
+  que soit le batch (7.76M × 128 ou 2.59M × 384 par GPU) ; le run SSM est borné à 30 % de
+  l'époque (894M fenêtres, = anneal-30) et ses checkpoints tombent tous les 5 % du run (1.5 %
+  de l'époque). Table compute : head8 25 % époque 746M fenêtres / 1.4 j GPU (0.5340) ; head8
+  5 % époque 149M / 0.3 j (0.5585) ; anneal-30 30 % époque 894M / 1.7 j (0.5375) ; SSM 6 %
+  époque 179M / 1.0 j (0.5334) ; SSM 7.5 % époque 223M / 1.3 j (0.5282, champion) ; SSM 9 %
+  époque 268M / 1.6 j (0.5301, 2e sous head8) ; SSM fin de run 30 % époque 894M / 5.2 j. Le
+  SSM coûte 3× par fenêtre (2000 contre 6100 fenêtres/s sur 3 GPU) : à temps GPU égal il bat
+  le champion, et avec 3.3× moins de données. Conséquence pour la coupe : le « pic à 25 % puis
+  dérive » de TimeJEPA (G7.3c) est à 25 % de l'ÉPOQUE, où le SSM n'est pas encore (LR à 80 %
+  du pic) — laisser courir au moins jusqu'à 15-20 % de l'époque avant de décider. Le stack
+  30 %-du-run (1.2936-v1) : 0.7760 / 0.5301 / couv. 0.693 sur 97, deuxième checkpoint sous
+  head8 ; couverture en baisse (0.805 → 0.693), à suivre.
+
 - **2026-09-13 (NOUVEAU CHAMPION : `epoch00_valloss1.2942` (25 % du run), stack flip + mix +
   pool, 0.7717 / 0.5282 / couverture 0.805 sur 97 configs, contre head8 0.7842 / 0.5340 /
   0.756)** — Table à 97 : 5 % 0.5761, 10 % 0.5419, 15 % 0.5305, 20 % 0.5334, 25 % 0.5282.
