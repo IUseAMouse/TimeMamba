@@ -1,20 +1,24 @@
 # @package _global_
 # SCALING POINT 2 (2026-09-14): the spike's architecture at 10M (d_model 384,
-# 8 blocks, 32 states) - one variable against ssm_mini_v3, capacity - for the
-# rented 8x GPU pod. DDP, not FSDP: at 10-20M the optimizer states are small,
-# DDP is the validated path of every run so far.
+# 8 blocks, 32 states) - one variable against ssm_mini_v3, capacity. DDP, not
+# FSDP: at 10-20M the optimizer states are small, DDP is the validated path.
 #
-#   torchrun-free: Lightning spawns the 8 ranks itself
+# Default = the current pod, 3x RTX 3090 (24 GB): batch 64 x accumulation 6 x
+# 3 GPUs = 1152 effective, the champion's recipe. Activations are ~2x the
+# 2.5M model's per item (d_inner 768), so half the batch of ssm_mini_v3 at the
+# same memory (the 2.5M ran at ~85% of 24 GB with batch 128). If OOM:
+# model.ssm.activation_checkpointing=true before lowering the batch.
+#
 #   python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3
 #
-# Budget (8x RTX 5090 at ~1 $/h/GPU): the 2.5M plateaued at 7.5% of the epoch
-# (223M windows). schedule_fraction 0.1 = 298M windows with the cosine
-# annealed on it, ~20 h at ~4k windows/s, ~160 $; checkpoints every 5% of the
-# run (every ~1 h). If the stack still descends at the last checkpoint,
-# resume with +training.resume_ckpt on a longer fraction.
-# Batch: 48 per GPU x 3 accumulation x 8 GPUs = 1152 effective, the champion's
-# recipe. Memory: activations ~2x the 2.5M model (d_inner 768); if OOM on
-# 32 GB, model.ssm.activation_checkpointing=true before lowering the batch.
+# Rented 8-GPU pod (5090 32 GB or A100 80 GB), same effective batch:
+#   ... data.batch_size=48 trainer.accumulate_grad_batches=3 data.num_workers=2
+#
+# Budget: the 2.5M plateaued at 7.5% of the epoch (223M windows).
+# schedule_fraction 0.1 = 298M windows with the cosine annealed on it:
+# ~6 days on 3x 3090 (~550 windows/s), ~20 h on 8x 5090; checkpoints every 5%
+# of the run. If the stack still descends at the last checkpoint, resume with
+# +training.resume_ckpt on a longer fraction.
 # Multi-rate training keeps the wide list: the wide arm improved the body by
 # 0.8 pt in decimation mode (0.5445 -> 0.5361) even though the knob itself
 # lost; the knob is not evaluated, the stack is.
@@ -40,11 +44,11 @@ training:
   schedule_fraction: 0.1
 
 data:
-  batch_size: 48
-  num_workers: 2          # 8 ranks on a 15-16 vCPU pod
+  batch_size: 64
+  num_workers: 8
 
 trainer:
-  accumulate_grad_batches: 3
+  accumulate_grad_batches: 6
   val_check_interval: 0.05
   strategy: "ddp_find_unused_parameters_true"
 
