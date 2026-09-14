@@ -5,6 +5,46 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-14 (TABLE WIDE COMPLÈTE, 5 checkpoints à 97 : bande 0.524-0.526, égalité avec
+  Toto-2.0-4m ; run 10M LANCÉ sur les 3× 3090)** — Stack flip + mix + pool, bras wide (20 %
+  à 100 % de son budget de 3 % d'époque) : 1.2836 0.7670 / 0.5257 / couv. 0.717 · 1.2845
+  0.7677 / 0.5260 / 0.705 · 1.2841 0.7679 / **0.5242** / 0.707 · 1.2817 0.7694 / 0.5255 /
+  0.709 · 1.2822 0.7686 / 0.5252 / 0.710. Écart max 0.18 pt de CRPS et 0.24 pt de MASE :
+  le corps est convergé pour ce bras, et la val loss ne discrimine plus (la plus basse,
+  1.2817, n'est pas le meilleur stack). Choisir "le bon checkpoint" dans cette bande
+  serait sélectionner sur le test : on PUBLIE LA BANDE (0.525 ± 0.002), le 1.2841 n'est
+  champion que par le chiffre. Toto-2.0-4m est à 0.5242 sur le leaderboard : égalité à la
+  quatrième décimale, avec un modèle de 2.5M et le stack d'inférence. Position tenue sur
+  la comparaison : le stack fait partie du modèle au même titre qu'un embedding de
+  fréquence fait partie de FlowState ; zero-shot, mêmes entrées (on n'utilise même pas la
+  fréquence), le calcul est déplacé de l'entraînement vers l'inférence. Que Toto-2.0
+  encode la fréquence n'est PAS vérifié : à sourcer avant de l'écrire. L'argument devient
+  imparable seulement si les modèles externes gagnent aussi avec le stack (table centrale
+  du papier RateIN, en attente de GPU). Le MASE ne bouge pas d'un checkpoint à l'autre :
+  le gain CRPS du wide vient de la calibration (q10 0.143-0.153, intervalle 80 % à
+  0.705-0.717 contre 0.805 pour le run classique), le fan s'est resserré et le modèle est
+  sous-couvert. Levier séparé, non exploré : température des quantiles à l'inférence, à
+  graver comme bras. **Vitesse** : le train est bien parallèle (convolution FFT, jamais la
+  récurrence) ; le ×3 par fenêtre contre TimeJEPA mini tient aux 1280 tokens par fenêtre
+  (10× le patching), à la largeur double du bloc gated et à la FFT float32 ; régime
+  limité par la bande passante mémoire, pas par le calcul. Marge restante : `torch.compile`
+  sur le bloc (1.3-1.5× attendu, à profiler avec `scripts/profile_step.py` sur un GPU
+  libre après le run), noyau FFT fusionné (FlashFFTConv, ce qui donne le 2× de S4 /
+  FlowState). Aucun des deux dans le run 10M : une variable. **Run 10M lancé** (`ssm_mid_v3`,
+  wide dès le départ, 13 facteurs p 0.7, pas de reprise de poids ; batch 64 × acc 6 × 3
+  GPU = 1152, num_workers 8, `schedule_fraction` 0.1, ~6 jours, ~100 € au tarif du pod
+  contre ~190 $ + migration sur 8× 5090 qui coûte ~2× par fenêtre). Décision : pas de
+  migration avant un 100M, qui ne se fait que si le 10M tient P-SSM.4 (courbe de scaling
+  à montrer, sinon point isolé), et sur TimeSSM, pas sur TimeJEPA. Réserve de lecture :
+  2.5M contre 10M n'est pas à une variable (le 2.5M a vu 5 facteurs sur 7.5 % puis 13 sur
+  3 % ; le 10M voit 13 facteurs sur 10 %) ; en cas d'échec, un bras 2.5M wide-from-scratch
+  départagerait capacité et recette, non planifié. Borne 0.1 et pas 0.3 : budget (6 j
+  contre 18), cosinus annealé sur la fraction (un run complet, lisible au dernier
+  checkpoint, comparable au 2.5M annealé ~10.5 % d'époque au total), et porte de sortie
+  par second anneal court ou `schedule_fraction=0.2` si le stack descend encore entre les
+  deux derniers checkpoints. Évals externes (Chronos-Bolt, TTM-R3, t0-alpha) à faire sur
+  un 4090 community pendant le run, elles ne dépendent que des données GIFT.
+
 - **2026-09-14 (P-SSM.2c ÉCHOUE ; le run wide donne pourtant un NOUVEAU CHAMPION par le stack :
   `wide 1.2836` 0.7670 / 0.5257 / couv. 0.717 contre 1.2942 0.7717 / 0.5282 / 0.805)** — Sur
   les quatre premiers checkpoints wide : delta sans garde 0.822-0.827 / 0.558-0.560 (bouton
