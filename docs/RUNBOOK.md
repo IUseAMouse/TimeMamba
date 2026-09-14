@@ -83,7 +83,8 @@ tar -C /workspace/TimeJEPA/data/processed -chf - lotsa_v3 | ssh <pod> 'tar -C /w
 # 1. tout ce qui doit être vert avant de payer (10-15 min) : tests, audit corpus, profil 1 pas, smoke DDP 30 pas + rechargement
 scripts/preflight.sh                      # CONFIG=ssm_mid_v3 par défaut (DEVICES=3 sur le pod 3090)
 # 2. le run (P-SSM.4 gravée dans la config)
-python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3 2>&1   # 3x3090 par défaut ; 8 GPU : data.batch_size=48 trainer.accumulate_grad_batches=3 data.num_workers=2 | tee logs/train_ssm_mid.log
+python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3 2>&1 | tee logs/train_ssm_mid.log
+# défaut = pod 3x3090 (batch 64 x acc 6) ; pod 8 GPU : data.batch_size=48 trainer.accumulate_grad_batches=3 data.num_workers=2
 # 3. évals sur un GPU pendant le run
 STACK="+tta_flip=true +ratein=mix +ratein_pool=true" EVAL_CONFIG=ssm_mid_v3_eval scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mid_v3_zs/pretrain_False +gift_batch_size=32
 ```
