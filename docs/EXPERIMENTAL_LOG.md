@@ -32,7 +32,7 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
   libre après le run), noyau FFT fusionné (FlashFFTConv, ce qui donne le 2× de S4 /
   FlowState). Aucun des deux dans le run 10M : une variable. **Run 10M lancé** (`ssm_mid_v3`,
   wide dès le départ, 13 facteurs p 0.7, pas de reprise de poids ; batch 64 × acc 6 × 3
-  GPU = 1152, num_workers 8, `schedule_fraction` 0.1, ~6 jours, ~100 € au tarif du pod
+  GPU = 1152, num_workers 8, `schedule_fraction` 0.1). Preflight passé (35 tests, audit corpus OK, smoke DDP 3 GPU). Profil mesuré : batch 48 129 fenêtres/s et 15.2 GiB, batch 64 134/s et 19.6 GiB, batch 80 et 96 OOM, batch 128 avec activation checkpointing 107/s et 9.6 GiB (le recalcul coûte plus que le batch ne rapporte). Le débit par fenêtre est plat en batch : régime mémoire-bound confirmé. 402 fenêtres/s sur 3 GPU → ~9 jours pour 298M fenêtres, pas 6 : le 10M coûte 5× le 2.5M par fenêtre, pas 3. ~150 € au tarif du pod
   contre ~190 $ + migration sur 8× 5090 qui coûte ~2× par fenêtre). Décision : pas de
   migration avant un 100M, qui ne se fait que si le 10M tient P-SSM.4 (courbe de scaling
   à montrer, sinon point isolé), et sur TimeSSM, pas sur TimeJEPA. Réserve de lecture :

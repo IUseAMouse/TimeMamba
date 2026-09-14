@@ -16,7 +16,9 @@
 #
 # Budget: the 2.5M plateaued at 7.5% of the epoch (223M windows).
 # schedule_fraction 0.1 = 298M windows with the cosine annealed on it:
-# ~6 days on 3x 3090 (~550 windows/s), ~20 h on 8x 5090; checkpoints every 5%
+# ~9 days on 3x 3090 (measured 134 windows/s per GPU at batch 64, 19.6 GiB; batch 80
+# and 96 OOM; batch 128 + activation checkpointing 107/s: slower), ~20 h on 8x
+# 5090; checkpoints every 5%
 # of the run. If the stack still descends at the last checkpoint, resume with
 # +training.resume_ckpt on a longer fraction.
 # Multi-rate training keeps the wide list: the wide arm improved the body by
