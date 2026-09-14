@@ -20,7 +20,7 @@ echo "== 2. corpus audit (106 files, 15.85 B observations)"
 (cd ../TimeJEPA && bash scripts/build_corpus_v3.sh --check)
 
 echo "== 3. one training step at the target size (memory and speed, 1 GPU)"
-CUDA_VISIBLE_DEVICES=0 python scripts/profile_step.py --config "$CONFIG" --batch 48 --no-profile
+CUDA_VISIBLE_DEVICES=0 python scripts/profile_step.py --config "$CONFIG" --batch "${BATCH:-$(python -c "from omegaconf import OmegaConf; print(OmegaConf.load(\"configs/$CONFIG.yaml\").data.batch_size)")}" --no-profile
 
 echo "== 4. DDP smoke: 30 optimizer steps on $DEVICES GPU, real corpus, checkpoint written and reloadable"
 S=/tmp/preflight_$$
@@ -33,10 +33,11 @@ echo "   checkpoint: $CK"
 CUDA_VISIBLE_DEVICES=0 python - "$CK" "$CONFIG" <<'PY'
 import sys; sys.path.insert(0, "src"); sys.path.insert(0, "../TimeJEPA/src")
 import torch
-from hydra import initialize, compose
+import os
+from hydra import initialize_config_dir, compose
 from timejepa.evaluation.loading import load_checkpoint
 from timessm.model import build_from_config
-with initialize(version_base=None, config_path="../configs"):
+with initialize_config_dir(version_base=None, config_dir=os.path.abspath("configs")):
     cfg = compose(config_name=sys.argv[2])
 m = load_checkpoint(build_from_config(cfg), sys.argv[1], torch.device("cuda"))
 out = m.forecast(50 + torch.randn(2, 1024, 1, device="cuda"), n=256)
