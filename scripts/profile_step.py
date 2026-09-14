@@ -6,6 +6,8 @@ TimeJEPA's per-sample cost; the per-step tokenization is the suspect).
     python scripts/profile_step.py                      # spike config, batch 128
     python scripts/profile_step.py --batch 64 --expand 1
     python scripts/profile_step.py --no-profile         # timing only
+    python scripts/profile_step.py --config ssm_mid_v3 --batch 96 --no-profile \
+        --set model.ssm.activation_checkpointing=true    # any config key
 """
 
 import argparse
@@ -29,12 +31,17 @@ def main():
     ap.add_argument("--expand", type=int, default=None)
     ap.add_argument("--steps", type=int, default=10)
     ap.add_argument("--no-profile", action="store_true")
+    ap.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE",
+                    help="config overrides, dotlist (model.ssm.activation_checkpointing=true)")
     args = ap.parse_args()
 
     with initialize(version_base=None, config_path="../configs"):
         cfg = compose(config_name=args.config)
     if args.expand is not None:
         cfg.model.ssm.expand = args.expand
+    if args.set:
+        from omegaconf import OmegaConf
+        cfg = OmegaConf.merge(cfg, OmegaConf.from_dotlist(args.set))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = build_from_config(cfg).to(device).train()
     head = model.decoder.decoder
