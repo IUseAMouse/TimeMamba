@@ -1,0 +1,12 @@
+# @package _global_
+# Eval namespace for the wide-range Delta arm's checkpoints
+# (evaluation/timessm_mini_v3_wide_zs/<ckpt>/gift<tag>/). Same architecture
+# keys as ssm_mini_v3; only the name differs.
+#   EVAL_CONFIG=ssm_mini_v3_wide_eval STACK="+ratein=delta +ratein_pool=true" \
+#       scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mini_v3_wide_zs/pretrain_False
+defaults:
+  - ssm_mini_v3_eval
+  - _self_
+
+model:
+  name: "timessm_mini_v3_wide_zs"

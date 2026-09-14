@@ -8,6 +8,7 @@
 #   scripts/eval_ssm.sh <ckpt> +ratein=delta                 # the Delta knob (P-SSM.2)
 #   scripts/eval_ssm.sh <ckpt> +ratein=backtest              # decimation, same selector
 #
+# EVAL_CONFIG=<name> picks another eval config (default ssm_mini_v3_eval);
 # TIMEJEPA=<path> overrides the sibling checkout. The GIFT data are read from
 # TimeJEPA (+gift_data_dir), the config from this repo (absolute config path).
 set -eu
@@ -19,5 +20,5 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 TIMEJEPA=${TIMEJEPA:-"$HERE/../TimeJEPA"}
 CK="$1"; shift
 PYTHONUNBUFFERED=1 python "$TIMEJEPA/scripts/evaluate_gift.py" \
-  --config-path "$HERE/configs" --config-name ssm_mini_v3_eval \
+  --config-path "$HERE/configs" --config-name "${EVAL_CONFIG:-ssm_mini_v3_eval}" \
   "+checkpoint_path=$CK" "+gift_data_dir=$TIMEJEPA/data/gift_eval" "$@"
