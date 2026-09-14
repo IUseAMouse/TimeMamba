@@ -75,6 +75,22 @@ au-delà, et n'est revendiqué qu'après un vrai run multi-GPU. Le checkpointing
 calcul et divise la mémoire d'activations par le nombre de blocs. Pod 8× 5090 : 15 vCPU pour
 8 processus, mettre `data.num_workers=1`.
 
+## Machine louée (8 GPU) : préflight puis run 10M en DDP (2026-09-14)
+
+```bash
+# 0. corpus : network volume attaché, ou copie déréférencée depuis l'ancien pod
+tar -C /workspace/TimeJEPA/data/processed -chf - lotsa_v3 | ssh <pod> 'tar -C /workspace/TimeJEPA/data/processed -xf -'
+# 1. tout ce qui doit être vert avant de payer (10-15 min) : tests, audit corpus, profil 1 pas, smoke DDP 30 pas + rechargement
+scripts/preflight.sh                      # CONFIG=ssm_mid_v3 par défaut
+# 2. le run (P-SSM.4 gravée dans la config)
+python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3 2>&1 | tee logs/train_ssm_mid.log
+# 3. évals sur un GPU pendant le run
+STACK="+tta_flip=true +ratein=mix +ratein_pool=true" EVAL_CONFIG=ssm_mid_v3_eval scripts/eval_checkpoints_ssm.sh checkpoints/timessm_mid_v3_zs/pretrain_False +gift_batch_size=32
+```
+
+DDP est le chemin validé ; FSDP (`trainer.strategy=fsdp`) n'a jamais tourné en multi-GPU : un smoke
+de 15 min sur le pod loué avant toute mention, jamais comme chemin principal.
+
 ## Doctrine
 
 Une variable par bras, prédictions gravées dans `docs/EXPERIMENTAL_LOG.md`

@@ -1,0 +1,52 @@
+# @package _global_
+# SCALING POINT 2 (2026-09-14): the spike's architecture at 10M (d_model 384,
+# 8 blocks, 32 states) - one variable against ssm_mini_v3, capacity - for the
+# rented 8x GPU pod. DDP, not FSDP: at 10-20M the optimizer states are small,
+# DDP is the validated path of every run so far.
+#
+#   torchrun-free: Lightning spawns the 8 ranks itself
+#   python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3
+#
+# Budget (8x RTX 5090 at ~1 $/h/GPU): the 2.5M plateaued at 7.5% of the epoch
+# (223M windows). schedule_fraction 0.1 = 298M windows with the cosine
+# annealed on it, ~20 h at ~4k windows/s, ~160 $; checkpoints every 5% of the
+# run (every ~1 h). If the stack still descends at the last checkpoint,
+# resume with +training.resume_ckpt on a longer fraction.
+# Batch: 48 per GPU x 3 accumulation x 8 GPUs = 1152 effective, the champion's
+# recipe. Memory: activations ~2x the 2.5M model (d_inner 768); if OOM on
+# 32 GB, model.ssm.activation_checkpointing=true before lowering the batch.
+# Multi-rate training keeps the wide list: the wide arm improved the body by
+# 0.8 pt in decimation mode (0.5445 -> 0.5361) even though the knob itself
+# lost; the knob is not evaluated, the stack is.
+#
+# P-SSM.4 (graved before the run): stack flip + mix + pool at the last
+# checkpoint <= 0.515 (10 pt under head8, 1 pt under the 2.5M champion 0.5257);
+# FAILURE if >= 0.525: capacity is not the lever at this data budget either.
+defaults:
+  - ssm_mini_v3
+  - _self_
+
+model:
+  name: "timessm_mid_v3_zs"
+  ssm:
+    d_model: 384
+    n_layers: 8
+    d_state: 32
+    activation_checkpointing: false
+
+training:
+  delta_scales: [0.020833, 0.03125, 0.041667, 0.0625, 0.083333, 0.125, 0.166667, 0.25, 0.333333, 0.5, 1.0, 2.0, 4.0]
+  p_delta_scale: 0.7
+  schedule_fraction: 0.1
+
+data:
+  batch_size: 48
+  num_workers: 2          # 8 ranks on a 15-16 vCPU pod
+
+trainer:
+  accumulate_grad_batches: 3
+  val_check_interval: 0.05
+  strategy: "ddp_find_unused_parameters_true"
+
+wandb:
+  tags: ["timessm", "ssm", "lti", "scaling", "10M", "lotsa", "v3", "ddp"]

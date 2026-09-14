@@ -1,0 +1,8 @@
+# @package _global_
+# Eval namespace for the 10M scaling run (evaluation/timessm_mid_v3_zs/...).
+defaults:
+  - ssm_mid_v3
+  - _self_
+
+model:
+  name: "timessm_mid_v3_zs"

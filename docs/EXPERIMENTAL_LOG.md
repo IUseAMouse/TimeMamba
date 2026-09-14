@@ -5,6 +5,27 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-14 (P-SSM.2c ÉCHOUE ; le run wide donne pourtant un NOUVEAU CHAMPION par le stack :
+  `wide 1.2836` 0.7670 / 0.5257 / couv. 0.717 contre 1.2942 0.7717 / 0.5282 / 0.805)** — Sur
+  les quatre premiers checkpoints wide : delta sans garde 0.822-0.827 / 0.558-0.560 (bouton
+  activé sur 37-39 configs), backtest dur 0.7821 / 0.5361 (1.2836) et 0.7872 / 0.5420
+  (1.2845). Delta perd 2.2 pt contre la décimation sur les mêmes poids : entraîner le bouton
+  sur toute la plage [1/48, 4] n'a rien changé au bouton. Mécanisme retenu : la décimation ne
+  change pas seulement l'échelle de temps, elle raccourcit contexte et horizon EN PAS pour la
+  tête (cross-attention sur moins de tokens, fan plus court), ce que le bouton ne fait pas par
+  construction — l'invariance exacte au rythme n'est pas ce que RateIN exploite. Résultat
+  négatif clos, publiable. En revanche le multi-rythme large a amélioré le CORPS : backtest
+  dur 0.5445 → 0.5361 (−0.8 pt) et stack 0.5282 → 0.5257, MASE 0.7717 → 0.7670 ; couverture
+  0.805 → 0.717 (le fan se resserre, à déclarer). Champion leaderboard : `wide 1.2836`
+  (`timessm_mini_v3_wide_zs`, checkpoint 1 du bras wide, 20 % de son budget) ; le 25 % du run
+  classique reste le meilleur en couverture. Cinquième checkpoint wide en cours d'éval.
+  **Scaling** : config `ssm_mid_v3` (d_model 384, 8 blocs, 10.1M), DDP (chemin validé ; FSDP
+  jamais couru en multi-GPU, smoke seulement), batch 48 × acc 3 × 8 GPU, `schedule_fraction`
+  0.1 (298M fenêtres, ~20 h à 8× 5090, ~160 $), multi-rythme large conservé (il a aidé le
+  corps). **P-SSM.4** : stack au dernier checkpoint ≤ 0.515 ; ÉCHEC si ≥ 0.525 (la capacité
+  n'est pas le levier à ce budget de données). `scripts/preflight.sh` : tests, audit corpus,
+  profil d'un pas, smoke DDP 30 pas + rechargement, à passer sur le pod loué avant le run.
+
 - **2026-09-13 (P-SSM.2b NE SE RÉPLIQUE PAS sur 1.2850 : hybride k ≤ 4 0.7920 / 0.5471 / couv.
   0.725 contre backtest dur 0.7901 / 0.5475 / 0.720 — 0.04 pt, bruit)** — Bilan sur deux
   checkpoints : +0.47 pt (1.2942), +0.04 pt (1.2850). Le bouton sur sa plage entraînée n'est
