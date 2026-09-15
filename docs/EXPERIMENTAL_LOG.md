@@ -5,6 +5,25 @@ gravées avant chaque run, une variable par bras, oracle = diagnostic jamais off
 
 ## Journal des mises à jour
 
+- **2026-09-15 (RUN 10M MORT À 4 h 45 : OOM de fragmentation au pas 52.7k ; et la fraction
+  0.1 valait 596 M fenêtres, pas 298 M — relance à 0.05 avec allocateur extensible)** —
+  Trace : `torch.fft.irfft` demande 466 Mio, 18.16 Gio alloués + **4.57 Gio réservés mais
+  inutilisables** : fragmentation du caching allocator par les formes variables (contextes
+  aléatoires 128..1024, tailles de FFT par item), pas un manque de mémoire (le profil à
+  1024 fixe pointe à 19.6 Gio). Correctif : `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`
+  posé dans `train_ssm.py` avant l'import de torch (hérité par les rangs DDP). Aucun
+  checkpoint écrit (val tous les 5 % du run, mort à 1.7 %) : relance de zéro, 4 h 45
+  perdues. Second constat, sur la barre de progression (52704 / 3 104 000 batches) : l'époque
+  du sampler DÉPEND DU BATCH — la plus grande famille reçoit floor(p × batch) ≥ 1 fenêtres
+  par batch, 2 à batch 128, 1 à batch 64, donc l'« époque » à batch 64 fait 5.96 B fenêtres
+  (31.04 M batches × 64 × 3) contre 2.98 B pour le 2.5M ; `schedule_fraction` 0.1 aurait
+  coûté 596 M fenêtres et 11.4 jours. Le budget se compte en FENÊTRES : 0.05 à batch 64 =
+  1.55 M batches × 64 × 3 = 298 M, ce qui était prévu ; P-SSM.4 inchangée. Vitesse mesurée
+  sous DDP 3.14 it/s par GPU = 603 fenêtres/s (contextes aléatoires plus courts que le profil
+  à 1024, 134/s) → ~5.7 jours, ~95 € au tarif du pod. Note pour les overrides 8 GPU de
+  l'en-tête : la fraction est à recalculer depuis les fenêtres, jamais recopiée. Commande :
+  `python scripts/train_ssm.py --config-name ssm_mid_v3 wandb.run_name=ssm-mid-v3`.
+
 - **2026-09-14 (TABLE WIDE COMPLÈTE, 5 checkpoints à 97 : bande 0.524-0.526, égalité avec
   Toto-2.0-4m ; run 10M LANCÉ sur les 3× 3090)** — Stack flip + mix + pool, bras wide (20 %
   à 100 % de son budget de 3 % d'époque) : 1.2836 0.7670 / 0.5257 / couv. 0.717 · 1.2845

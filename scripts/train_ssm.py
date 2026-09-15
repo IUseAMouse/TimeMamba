@@ -13,8 +13,16 @@ training on the Delta knob, SSMFinetuneModule) and `model.ssm.*`.
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
+
+# Randomized context lengths (128..1024) and per-item FFT sizes fragment the
+# caching allocator: the 10M run died after 4h45 with 18.2 GiB allocated and
+# 4.6 GiB reserved-but-unallocated (2026-09-15). Expandable segments let the
+# allocator grow blocks in place instead of stranding them. Set before torch
+# is imported; the DDP worker processes inherit it.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import hydra
 import pytorch_lightning as pl

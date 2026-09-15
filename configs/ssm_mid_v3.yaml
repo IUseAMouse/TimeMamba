@@ -13,14 +13,23 @@
 #
 # Rented 8-GPU pod (5090 32 GB or A100 80 GB), same effective batch:
 #   ... data.batch_size=48 trainer.accumulate_grad_batches=3 data.num_workers=2
+#   and training.schedule_fraction recomputed so that batches x 48 x 8 = 298M
 #
-# Budget: the 2.5M plateaued at 7.5% of the epoch (223M windows).
-# schedule_fraction 0.1 = 298M windows with the cosine annealed on it:
-# ~9 days on 3x 3090 (measured 134 windows/s per GPU at batch 64, 19.6 GiB; batch 80
-# and 96 OOM; batch 128 + activation checkpointing 107/s: slower), ~20 h on 8x
-# 5090; checkpoints every 5%
-# of the run. If the stack still descends at the last checkpoint, resume with
-# +training.resume_ckpt on a longer fraction.
+# Budget: the 2.5M plateaued at 7.5% of ITS epoch (223M windows). The budget
+# is counted in WINDOWS, not in epoch fractions: the sampler's epoch depends on
+# the batch size (the largest family gets floor(p x batch) >= 1 samples per
+# batch: 2 at batch 128, 1 at batch 64, so the batch-64 "epoch" is 5.96 B
+# windows, twice the 2.98 B of the 2.5M run). schedule_fraction 0.05 at batch 64
+# = 1.55M batches x 64 x 3 GPU = 298M windows with the cosine annealed on it
+# (0.1 at batch 48 x 8 GPU is NOT the same budget: recompute from the windows).
+# Measured 2026-09-15 under DDP: 3.14 it/s per GPU = 603 windows/s on 3x 3090
+# (random contexts are shorter than the 1024 of the profile) -> ~5.7 days;
+# checkpoints every 5% of the run. If the stack still descends at the last
+# checkpoint, resume with +training.resume_ckpt on a longer fraction.
+# Memory: batch 64 peaks at 19.6 GiB on a fixed 1024 context; batch 80 and 96
+# OOM; batch 128 + activation checkpointing is slower (107 vs 134 windows/s).
+# The allocator runs with expandable segments (train_ssm.py) after a
+# fragmentation OOM at step 52.7k.
 # Multi-rate training keeps the wide list: the wide arm improved the body by
 # 0.8 pt in decimation mode (0.5445 -> 0.5361) even though the knob itself
 # lost; the knob is not evaluated, the stack is.
@@ -43,7 +52,7 @@ model:
 training:
   delta_scales: [0.020833, 0.03125, 0.041667, 0.0625, 0.083333, 0.125, 0.166667, 0.25, 0.333333, 0.5, 1.0, 2.0, 4.0]
   p_delta_scale: 0.7
-  schedule_fraction: 0.1
+  schedule_fraction: 0.05      # of the batch-64 epoch = 298M windows, see header
 
 data:
   batch_size: 64
